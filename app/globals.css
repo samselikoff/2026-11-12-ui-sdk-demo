@@ -1,4 +1,8 @@
+/* ui-sdk sits after Tailwind's base so preflight doesn't erase web.css, and before utilities so classes still win. */
+@layer theme, base, ui-sdk, components, utilities;
+
 @import "tailwindcss";
+@import "@ui-sdk/core/web.css";
 
 :root {
   --background: #ffffff;
@@ -17,6 +21,12 @@
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+:root {
+  --ui-background: var(--background);
+  --ui-foreground: var(--foreground);
+  --ui-font-sans: var(--font-geist-sans);
 }
 
 body {
