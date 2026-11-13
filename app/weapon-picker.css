@@ -1,0 +1,149 @@
+@layer components {
+  [data-slot="radial-picker"] {
+    --hub: 8rem;
+    --disc: 22rem;
+    --pie: oklch(0.22 0.02 250 / 0.88);
+    --pie-edge: oklch(0.45 0.02 250);
+    --pie-icon: oklch(0.82 0.01 250);
+    --pie-highlight: oklch(0.58 0.02 250 / 0.92);
+    --pie-accent: oklch(0.8 0.08 230);
+    --pie-chosen: oklch(0.86 0.15 85);
+
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: var(--hub);
+    height: var(--hub);
+  }
+
+  [data-slot="radial-picker-trigger"] {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: var(--hub);
+    height: var(--hub);
+    padding-inline: 0.75rem;
+    border: 1px solid oklch(0.55 0.01 286);
+    border-radius: 50%;
+    background: var(--background);
+    color: var(--foreground);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-transform: uppercase;
+    box-shadow: 0 1px 2px oklch(0 0 0 / 0.08);
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    transition:
+      background-color 0.15s,
+      color 0.15s,
+      border-color 0.15s,
+      box-shadow 0.15s;
+
+    &[data-placeholder] {
+      color: oklch(0.55 0.01 286);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--foreground);
+      outline-offset: 4px;
+    }
+
+    &[data-open] {
+      border-color: transparent;
+      background: oklch(0.16 0.02 250 / 0.96);
+      color: white;
+      box-shadow:
+        0 0 0 0.375rem oklch(0.16 0.02 250 / 0.96),
+        0 0 0 0.5rem var(--pie-accent);
+    }
+  }
+
+  [data-slot="radial-picker-ring"] {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--disc);
+    height: var(--disc);
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: var(--pie);
+    box-shadow: 0 12px 40px -8px oklch(0 0 0 / 0.5);
+    backdrop-filter: blur(6px);
+    transition:
+      opacity 0.15s,
+      scale 0.15s ease-out;
+
+    @starting-style {
+      opacity: 0;
+      scale: 0.85;
+    }
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      pointer-events: none;
+      background: repeating-conic-gradient(
+        from calc(0.5turn / var(--radial-count) - 0.3deg),
+        var(--pie-edge) 0 0.6deg,
+        transparent 0.6deg calc(1turn / var(--radial-count))
+      );
+    }
+  }
+
+  /* Wedge i is centered on i / count turns from the top, the same wedges sectorOf picks when dragging. */
+  [data-slot="radial-picker-option"] {
+    --angle: calc(var(--radial-index) * 1turn / var(--radial-count));
+    --from: calc(var(--angle) - 0.5turn / var(--radial-count));
+    --to: calc(var(--angle) + 0.5turn / var(--radial-count));
+    --label-radius: calc((var(--hub) + var(--disc)) / 4 + 0.25rem);
+
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    clip-path: polygon(
+      50% 50%,
+      calc(50% + 75% * sin(var(--from))) calc(50% - 75% * cos(var(--from))),
+      calc(50% + 75% * sin(var(--angle))) calc(50% - 75% * cos(var(--angle))),
+      calc(50% + 75% * sin(var(--to))) calc(50% - 75% * cos(var(--to)))
+    );
+    color: var(--pie-icon);
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background-color 0.1s,
+      color 0.1s,
+      scale 0.12s ease-out;
+
+    & > span {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      display: grid;
+      translate: calc(-50% + sin(var(--angle)) * var(--label-radius))
+        calc(-50% - cos(var(--angle)) * var(--label-radius));
+    }
+
+    & svg {
+      width: 3rem;
+      height: 1.5rem;
+    }
+
+    &[aria-selected="true"] {
+      color: var(--pie-chosen);
+    }
+
+    /* Grows from the disc's center, so only its outer edge juts past the rim. */
+    &[data-highlighted] {
+      z-index: 1;
+      scale: 1.05;
+      background: var(--pie-highlight);
+      color: white;
+    }
+  }
+}
