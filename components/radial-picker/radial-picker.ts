@@ -40,6 +40,8 @@ export type RadialPickerOptions = {
     open: boolean,
     details: ChangeDetails<RadialPickerOpenReason>
   ) => void;
+  /** How long the ring stays open after a choice, in ms, so the chosen option can confirm it, like a macOS menu's flash. */
+  confirmDelay?: number;
 };
 
 type State = {
@@ -47,6 +49,8 @@ type State = {
   value: string | null;
   open: boolean;
   highlighted: string | null;
+  confirming: string | null;
+  confirmDelay: number;
 };
 
 export const radialPicker = definePrimitive({
@@ -59,6 +63,7 @@ export const radialPicker = definePrimitive({
     open: "boolean",
     defaultOpen: "boolean",
     onOpenChange: "callback",
+    confirmDelay: "number",
   },
   controlled: ["value", "open"],
   state: (options: RadialPickerOptions): State => ({
@@ -66,9 +71,12 @@ export const radialPicker = definePrimitive({
     value: options.value ?? options.defaultValue ?? null,
     open: options.open ?? options.defaultOpen ?? false,
     highlighted: null,
+    confirming: null,
+    confirmDelay: options.confirmDelay ?? 0,
   }),
   sync: (options) => ({
     items: options.items ?? [],
+    confirmDelay: options.confirmDelay ?? 0,
     ...(options.value === undefined ? {} : { value: options.value }),
     ...(options.open === undefined ? {} : { open: options.open }),
   }),
@@ -80,10 +88,14 @@ export const radialPicker = definePrimitive({
       focus: "virtual",
     });
 
+    let confirmTimer: ReturnType<typeof setTimeout> | undefined;
+
     const setOpen = (
       open: boolean,
       { reason, event }: { reason: RadialPickerOpenReason; event?: Event }
     ) => {
+      clearTimeout(confirmTimer);
+      if (store.get().confirming) store.set({ confirming: null });
       change("open", open, { reason, event });
       listbox.highlight(store.get().open ? store.get().value : null, { event });
     };
@@ -93,8 +105,18 @@ export const radialPicker = definePrimitive({
       { reason, event }: { reason: "item-press" | "trigger-release"; event?: Event }
     ) => {
       change("value", value, { reason, event });
-      setOpen(false, { reason, event });
+      const { confirmDelay } = store.get();
+      if (confirmDelay <= 0) {
+        setOpen(false, { reason, event });
+        return;
+      }
+      listbox.highlight(value, { event });
+      store.set({ confirming: value });
+      clearTimeout(confirmTimer);
+      confirmTimer = setTimeout(() => setOpen(false, { reason, event }), confirmDelay);
     };
+
+    const confirming = () => store.get().confirming !== null;
 
     const itemAt = (trigger: HTMLElement, x: number, y: number) => {
       const { items } = store.get();
@@ -110,7 +132,10 @@ export const radialPicker = definePrimitive({
 
     let stopDrag: (() => void) | undefined;
     let pressed = false;
-    context.onDestroy(() => stopDrag?.());
+    context.onDestroy(() => {
+      stopDrag?.();
+      clearTimeout(confirmTimer);
+    });
 
     return {
       listbox,
@@ -120,16 +145,22 @@ export const radialPicker = definePrimitive({
         change("value", value, { reason: "imperative" }),
       setOpen,
       choose,
+      confirming,
       toggle(event?: Event) {
         // A pointer press already opened and closed the ring; its click shouldn't toggle it again.
         if (pressed) {
           pressed = false;
           return;
         }
+        if (confirming()) return;
         setOpen(!store.get().open, { reason: "trigger-press", event });
       },
 
       keydown(event: KeyboardEvent) {
+        if (confirming()) {
+          event.preventDefault();
+          return;
+        }
         const { open, highlighted } = store.get();
         const arrow = event.key.startsWith("Arrow");
         if (!open) {
@@ -155,7 +186,7 @@ export const radialPicker = definePrimitive({
       },
 
       pointerdown(event: PointerEvent, el: HTMLElement) {
-        if (event.button !== 0) return;
+        if (event.button !== 0 || confirming()) return;
         if (!store.get().open) setOpen(true, { reason: "trigger-press", event });
         if (!store.get().open) return;
         pressed = true;
@@ -235,7 +266,10 @@ export const radialPicker = definePrimitive({
       attrs: (state, part) => ({
         id: `${part.id}-ring`,
         "aria-labelledby": `${part.id}-root`,
-        style: css({ "--radial-count": state.items.length }),
+        style: css({
+          "--radial-count": state.items.length,
+          "--radial-confirm-delay": `${state.confirmDelay}ms`,
+        }),
       }),
       bind: (el, part) =>
         bindLayer(el, {
@@ -253,6 +287,7 @@ export const radialPicker = definePrimitive({
       props: { value: "string" },
       selects: selects({
         highlighted: ({ key }) => [key, null],
+        confirming: ({ key }) => [key, null],
         value: ({ key }) => [key, null],
       }),
       attrs: (state, part) => {
@@ -260,18 +295,21 @@ export const radialPicker = definePrimitive({
         return {
           ...part.api.listbox.attrs(state, part),
           "aria-selected": String(state.value === part.key),
+          "data-confirming": state.confirming === part.key ? "" : undefined,
           style: css({
             "--radial-index": index,
             "--radial-count": state.items.length,
           }),
         };
       },
-      press: ({ key, api }, event) =>
-        api.choose(key, { reason: "item-press", event }),
+      press: ({ key, api }, event) => {
+        if (!api.confirming()) api.choose(key, { reason: "item-press", event });
+      },
       on: {
         pointerdown: (event) => event.preventDefault(),
-        pointermove: (event, { key, api }) =>
-          api.listbox.highlight(key, { event }),
+        pointermove: (event, { key, api }) => {
+          if (!api.confirming()) api.listbox.highlight(key, { event });
+        },
       },
       bind: (el, part) => part.api.listbox.bind(el, part),
     }),

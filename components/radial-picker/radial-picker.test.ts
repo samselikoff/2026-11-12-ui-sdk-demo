@@ -248,6 +248,53 @@ test("pressing the button while the keyboard has the ring open closes it", async
   expect(open(view)).toBe(false);
 });
 
+test("with confirmDelay, the choice blinks before the ring closes, and input waits", async () => {
+  const view = mountPicker({ confirmDelay: 300 });
+  const el = trigger(view);
+  centered(el);
+
+  pointer("pointerdown", el, 50, 50);
+  pointer("pointermove", el, 140, 55);
+  await frame();
+  pointer("pointerup", el, 140, 55);
+  click(el);
+  expect(view.state.value).toBe("house");
+  expect(open(view)).toBe(true);
+  const house = view.part("option", "house") as HTMLElement;
+  expect(house.hasAttribute("data-confirming")).toBe(true);
+  expect(house.hasAttribute("data-highlighted")).toBe(true);
+  expect((view.part("ring") as HTMLElement).style.getPropertyValue("--radial-confirm-delay")).toBe("300ms");
+
+  el.focus();
+  await view.keys("ArrowDown");
+  expect(view.state.highlighted).toBe("house");
+  await view.hover(view.part("option", "condo") as HTMLElement);
+  expect(view.state.highlighted).not.toBe("condo");
+  expect(house.hasAttribute("data-confirming")).toBe(true);
+  await view.click(view.part("option", "condo") as HTMLElement);
+  expect(view.state.value).toBe("house");
+
+  await new Promise((r) => setTimeout(r, 340));
+  expect(open(view)).toBe(false);
+  expect(house.isConnected).toBe(false);
+  expect(view.state.confirming).toBe(null);
+});
+
+test("closing during the confirm blink cancels it", async () => {
+  const view = mountPicker({ confirmDelay: 60 });
+  trigger(view).click();
+  await view.click(view.part("option", "condo") as HTMLElement);
+  expect(open(view)).toBe(true);
+
+  view.api.setOpen(false, { reason: "escape-key" });
+  expect(open(view)).toBe(false);
+  expect(view.state.confirming).toBe(null);
+
+  trigger(view).click();
+  await new Promise((r) => setTimeout(r, 90));
+  expect(open(view)).toBe(true);
+});
+
 test("renders on the server", () => {
   const html = checkServer(radialPicker, { items, defaultValue: "house" }, markup);
   expect(html).toContain('role="combobox"');

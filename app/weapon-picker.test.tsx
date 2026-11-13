@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createAgent } from "@ui-sdk/react/agent";
 import { expect, test } from "vitest";
@@ -38,7 +38,10 @@ test("shows the placeholder, the highlighted weapon while open, then the chosen 
   );
 
   await user.click(screen.getByRole("option", { name: "Knife" }));
-  expect(ring.isConnected).toBe(false);
+  expect(trigger.textContent).toBe("Knife");
+  expect(screen.getByRole("option", { name: "Knife" }).hasAttribute("data-confirming")).toBe(true);
+  await user.click(screen.getByRole("option", { name: "Pistol" }));
+  await waitFor(() => expect(ring.isConnected).toBe(false), { timeout: 4000 });
   expect(trigger.textContent).toBe("Knife");
   expect(trigger.hasAttribute("data-placeholder")).toBe(false);
   expect(document.activeElement).toBe(trigger);

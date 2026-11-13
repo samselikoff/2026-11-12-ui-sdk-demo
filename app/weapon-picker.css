@@ -5,7 +5,8 @@
     --pie: oklch(0.22 0.02 250 / 0.88);
     --pie-edge: oklch(0.45 0.02 250);
     --pie-icon: oklch(0.82 0.01 250);
-    --pie-highlight: oklch(0.58 0.02 250 / 0.92);
+    --pie-highlight: oklch(0.58 0.02 250);
+    --pie-solid: oklch(0.22 0.02 250);
     --pie-accent: oklch(0.8 0.08 230);
     --pie-chosen: oklch(0.86 0.15 85);
 
@@ -138,6 +139,16 @@
       color: var(--pie-chosen);
     }
 
+    &[data-confirming] {
+      z-index: 1;
+      scale: 1.05;
+      animation: radial-picker-confirm var(--radial-confirm-delay) steps(1, end);
+
+      @media (prefers-reduced-motion: reduce) {
+        animation: none;
+      }
+    }
+
     /* Grows from the disc's center, so only its outer edge juts past the rim. */
     &[data-highlighted] {
       z-index: 1;
@@ -145,5 +156,16 @@
       background: var(--pie-highlight);
       color: white;
     }
+  }
+}
+
+@keyframes radial-picker-confirm {
+  0% {
+    background: var(--pie-solid);
+    color: var(--pie-icon);
+  }
+  50% {
+    background: var(--pie-highlight);
+    color: white;
   }
 }
